@@ -12,16 +12,29 @@
   import { UnrealBloomPass } from 'https://esm.sh/three/examples/jsm/postprocessing/UnrealBloomPass.js';
   const elem = document.getElementById("3d-graph");
 
-    const tri = new GrowingGraph(2182);
+    const tri = new GrowingGraph(0b0000_1100_1011_1100);
     //0b0000_1100_1011_1100
     //0b0101_0110_1100_1100
-    const {nodes, links} = tri;
-    nodes.forEach((node,i)=>{node.id = i;});
+    const {nodes} = tri, links = [];
+    function updateLinks() {
+        nodes.forEach((node,i)=>{node.id = i;});
+        for (let source=0, i=0; source<nodes.length; ++source) {
+            for (const target of nodes[source]) {
+                if (source > target) continue;
+                links[i] = links[i] || {};
+                links[i].source = nodes[source];
+                links[i].target = nodes[target];
+                ++i
+            }
+        }
+    }     
+    updateLinks();   
     const Graph = new ForceGraph3D(elem)
         .backgroundColor('#000003')
         .enableNodeDrag(true)
         .linkOpacity(0.5)
         .numDimensions(3)
+        .d3VelocityDecay(0.1)
         //.zoomToFit(1000,1000)
         .nodeColor(node=>tri.states[node.id] ? '#6bfb6b' : '#ff6b6b')
         .graphData({nodes, links});
@@ -34,14 +47,14 @@
     bloomPass.strength = 2;
     bloomPass.radius = 1;
     bloomPass.threshold = 0.0;
-    Graph.postProcessingComposer().addPass(bloomPass);    
+    Graph.postProcessingComposer().addPass(bloomPass);
+
+
 
     setInterval(() => {
         if (tri.nodes.length > 3000) return;
         tri.grow();
-        const { nodes, links } = tri;
-        nodes.forEach((node,i)=>{node.id = i;});
-
+        updateLinks();
         Graph.graphData({nodes, links});
     }, 50);
 

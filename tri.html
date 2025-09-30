@@ -38,7 +38,7 @@
 //0b0101_0110_1100_1100
 //0b0000_1100_1011_1100 - interesting
 
-        const rule = 2182;
+        const rule = 0b0000_1100_1011_1100;
         const GrowthLimit = 10000;
 
         let graph, simulation;
@@ -75,28 +75,32 @@
 
             const {pointN, pos} = simulation;
             const {lastGen} = graph;
-            let linkN = 0;
+            //let linkN = 0;
             for (let i=0; i<pointN; ++i) {
                 for (let c=0; c<3; ++c) {
                     points[i*4+c] = pos[i*3+c];
                 }
                 points[i*4+3] = graph.nodes[i].gen;
-                for (const j of graph.nodes[i]) {
-                    if (i>j) continue;
-                    links[linkN*2] = i; links[linkN*2+1] = j;
-                    linkN++;
-                }
+                // for (const j of graph.nodes[i]) {
+                //     if (i>j) continue;
+                //     links[linkN*2] = i; links[linkN*2+1] = j;
+                //     linkN++;
+                // }
             }
+            const linkN = graph.links.length/2;
+            links.set(graph.links);
             const pointsTex = glsl({}, {data:points, size:[256, 256], format:'rgba32f', tag:'points'});
             const linksTex = glsl({}, {data:links, size:[256, 256], format:'rg32i', tag:'links'})
             glsl({pointsTex, linksTex, center, extent, time, Grid:[linkN], Blend:'s*sa+d*(1-sa)', Aspect:'fit', VP:`
                 #define id2xy(id) ivec2((id)&0xff, (id)>>8)
                 ivec2 link = linksTex(id2xy(ID.x)).xy;
-                vec2 p0 = pointsTex(id2xy(link.x)).xy;
-                vec2 p1 = pointsTex(id2xy(link.y)).xy;
-                vec2 dp = normalize(p1-p0);
-                vec2 p = mix(p0, p1, UV.x) + vec2(-dp.y, dp.x)*XY.y;
-                VPos.xy = 1.9*(p.xy-center.xy)/(extent+30.);
+                vec3 p0 = pointsTex(id2xy(link.x)).xyz-center;
+                vec3 p1 = pointsTex(id2xy(link.y)).xyz-center;
+                //p0.xz *= rot2(time/1000.0);
+                //p1.xz *= rot2(time/1000.0);
+                vec2 dp = normalize(p1.xy-p0.xy);
+                vec2 p = mix(p0, p1, UV.x).xy + vec2(-dp.y, dp.x)*XY.y;
+                VPos.xy = 1.9*p.xy/(extent+30.);
             `, FP:`1.`});
             glsl({pointsTex, lastGen, center, extent, time, Grid:[pointN], Blend:'s*sa+d*(1-sa)', Aspect:'fit', VP:`
             vec3 color_map(float t) {
@@ -112,9 +116,11 @@
             void vertex() {
                 #define id2xy(id) ivec2((id)&0xff, (id)>>8)
                 vec4 p = pointsTex(id2xy(ID.x));
+                p.xyz -= center;
+                //p.xz *= rot2(time/1000.0);
                 varying vec3 color = color_map(p.w/(lastGen+1.));
                 //varying vec3 color = color_map(float(ID.x)/float(Grid.x-1));
-                VPos.xy = 1.9*(p.xy-center.xy+XY*10.0)/(extent+30.);
+                VPos.xy = 1.9*(p.xy+XY*10.0)/(extent+30.);
             }`, FP:`vec4(color,1)*smoothstep(1.0, 0.8, length(XY))`});
 
             /*

@@ -1,3 +1,5 @@
+#include <wasm_simd128.h>
+
 #ifdef WASM
     #define WASM_EXPORT(name) __attribute__((export_name(name)))
     void * alloc(int size);
@@ -36,13 +38,57 @@ void * alloc(int size) {
 const int max_point_n = 1<<16;
 const int max_node_n = 1<<16;
 
-BUFFER(points, float, max_point_n*3);
+BUFFER(sorted_points, float, max_point_n*3);
 BUFFER(forces, float, max_point_n*3);
 
 BUFFER(node_start, int, max_node_n);
 BUFFER(node_end, int, max_node_n);
+BUFFER(node_level, int, max_node_n);
+BUFFER(node_parent, int, max_node_n);
 BUFFER(node_next, int, max_node_n);
-BUFFER(node_center_size, float, max_node_n*4);
+
+BUFFER(node_center, float, max_node_n*3);
+BUFFER(node_extent, float, max_node_n);
+
+
+// WASM_EXPORT("add_vectors")
+// void add_vectors(const float* a, const float* b, float* result, int len) {
+//     const v128_t * va = (const v128_t *)a;
+//     const v128_t * vb = (const v128_t *)b;
+//     v128_t * vr = (v128_t *)result;
+//     for (int i=0; i<len; ++i) {
+//         vr[i] = wasm_f32x4_add(va[i], vb[i]);
+//     }
+// }
+
+WASM_EXPORT("accumPoints")
+void accumPoints(int nodeN, float treeExtent) {
+    for (int i=0; i<nodeN*3; ++i) {
+        node_center[i] = 0.0f;
+    }
+    for (int ni=nodeN-1; ni>=0; --ni) {
+        if (node_next[ni] == ni+1) { // leaf
+            for (int i=node_start[ni]; i<node_end[ni]; ++i) {
+                node_center[ni*3]   += sorted_points[i*3];
+                node_center[ni*3+1] += sorted_points[i*3+1];
+                node_center[ni*3+2] += sorted_points[i*3+2];
+            }
+        } 
+        int parent = node_parent[ni];
+        if (parent == ni) continue;
+        node_center[parent*3]   += node_center[ni*3];
+        node_center[parent*3+1] += node_center[ni*3+1];
+        node_center[parent*3+2] += node_center[ni*3+2];
+    }
+    for (int i=0; i<nodeN; ++i) {
+        const float mass = (float)(node_end[i] - node_start[i]);
+        node_center[i*3]   /= mass;
+        node_center[i*3+1] /= mass;
+        node_center[i*3+2] /= mass;
+        node_extent[i] = treeExtent / (1<<node_level[i]);
+    }
+}
+
 
 WASM_EXPORT("calcMultibodyForce")
 void calcMultibodyForce(int pointN, int nodeN, float maxDist) {
@@ -50,17 +96,17 @@ void calcMultibodyForce(int pointN, int nodeN, float maxDist) {
     const float maxDist2 = maxDist * maxDist;
 
     for (int pointI = 0; pointI < pointN; ++pointI) {
-        const float x = points[pointI * 3];
-        const float y = points[pointI * 3 + 1];
-        const float z = points[pointI * 3 + 2];
+        const float x = sorted_points[pointI * 3];
+        const float y = sorted_points[pointI * 3 + 1];
+        const float z = sorted_points[pointI * 3 + 2];
         float fx = 0.0f, fy = 0.0f, fz = 0.0f;
 
         for (int nodeI = 0; nodeI < nodeN;) {
-            const float dx = node_center_size[nodeI * 4] - x;
-            const float dy = node_center_size[nodeI * 4 + 1] - y;
-            const float dz = node_center_size[nodeI * 4 + 2] - z;
+            const float dx = node_center[nodeI * 3] - x;
+            const float dy = node_center[nodeI * 3 + 1] - y;
+            const float dz = node_center[nodeI * 3 + 2] - z;
             const float l2 = dx * dx + dy * dy + dz * dz;
-            const float w = node_center_size[nodeI * 4 + 3];
+            const float w = node_extent[nodeI];
 
             if (w * w < theta2 * l2) { // Far enough, treat as a single body (Barnes-Hut approximation)
                 if (l2 < maxDist2) { // but not too far
@@ -72,9 +118,9 @@ void calcMultibodyForce(int pointN, int nodeN, float maxDist) {
             } else { // Too close, traverse children or individual points
                 if (node_next[nodeI] == nodeI + 1 && l2 < maxDist2) { // It's a leaf node and not too far
                     for (int i = node_start[nodeI]; i < node_end[nodeI]; ++i) {
-                        const float p_dx = points[i * 3] - x;
-                        const float p_dy = points[i * 3 + 1] - y;
-                        const float p_dz = points[i * 3 + 2] - z;
+                        const float p_dx = sorted_points[i * 3] - x;
+                        const float p_dy = sorted_points[i * 3 + 1] - y;
+                        const float p_dz = sorted_points[i * 3 + 2] - z;
                         const float p_l2 = p_dx * p_dx + p_dy * p_dy + p_dz * p_dz;
                         const float c = 1.0f / (1.0f + p_l2);
                         fx += c * p_dx; fy += c * p_dy; fz += c * p_dz;

@@ -17,6 +17,22 @@ class GrowingGraph {
         this.dividing = [];
         this.phase = 0;
         this.nodes.forEach(n=>{n.gen = 0;});
+        this.links = this.updateLinks();
+    }
+
+    get nodeN() {
+        return this.nodes.length;
+    }
+
+    updateLinks() {
+        const links = [];
+        for (let i=0; i<this.nodes.length; ++i) {
+            for (const j of this.nodes[i]) {
+                if (i>j) continue;
+                links.push(i, j);
+            }
+        }
+        return new Int32Array(links);
     }
 
     reconnect(source, oldPeer, newPeer) {
@@ -51,6 +67,7 @@ class GrowingGraph {
                 nodes[i].gen = nodes[j].gen = nodes[k].gen = this.lastGen;
                 this.dividing[i] = 0;
             }
+            this.links = this.updateLinks();
         }
         this.phase = 1-this.phase;
         return this;
