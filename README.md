@@ -1,5 +1,9 @@
 # Growing Graphs & High-Performance Visualization
 
+<p align="center">
+  <img src="preview.jpg" width="800">
+</p>
+
 A high-performance engine for simulating and visualizing rule-based growing graphs. This project combines graph-rewriting automata with a custom force-directed layout engine optimized using WebAssembly and WebGL.
 
 ## 🚀 Key Features
