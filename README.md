@@ -36,10 +36,13 @@ Requires the **[Zig](https://ziglang.org)** compiler to targeting `wasm32-freest
 
 ## 📂 Project Structure
 
--   `main.c`: WASM physics core (Octree, Barnes-Hut, Link Forces).
--   `force.js`: Interface between JS and WASM physics.
--   `graph.js`: Graph management and rewriting logic.
--   `app.js`: High-level application controller and autonomous behavior.
+-   `src/main.c`: WASM physics core (Octree, Barnes-Hut, Link Forces).
+-   `js/app.js`: High-level application controller and autonomous behavior.
+-   `js/force.js`: Interface between JS and WASM physics.
+-   `js/graph.js`: Graph management and rewriting logic.
+-   `js/bloom.js`: Bloom post-processing effect.
+-   `js/tree.js`: Vanilla JS Octree implementation (kept for reference).
+-   `lib/`: External dependencies (SwissGL, dat.gui).
 -   `index.html`: Interactive simulation viewer.
 -   `alice.html`: Autonomous generative art mode.
 
