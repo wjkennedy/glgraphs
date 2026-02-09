@@ -1,4 +1,4 @@
-# Growing Graphs & High-Performance Visualization
+# Growing Graphs & High-Performance Visualization -  ✨[DEMO](https://znah.net/graphs/)✨
 
 <p align="center">
   <img src="preview.jpg" width="800">
